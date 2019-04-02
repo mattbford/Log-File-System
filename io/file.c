@@ -3,21 +3,24 @@
 #include <string.h>
 #include "../disk/disk.h"
 
-const int INODE_SIZE = 32;
+//increased INode size to support block addresses as a 4 byte int rather than 2 byte hex
+const int INODE_SIZE = 52;
 const int debug = 1;
 const int BLOCK_SIZE;
 const int NUM_BLOCKS;
 int NUM_INODES = 0;
 
-char* createINode(FILE* file, char* type, int* block_addr) {
-    char * INode = (char*)malloc(INODE_SIZE);
+//int indirect: 0 - not an indirect, 1 - single indirect, 2 - double indirect
+char* createINode(FILE* file, char* type, int* block_addr, int indirect) {
+    char* INode = (char*)calloc(INODE_SIZE * sizeof(char),1);
 
     //Convert INODE number to 4 byte string
-    char temp[4];
-    temp[0] = (NUM_INODES >> 24) & 0xFF + '0';
-    temp[1] = (NUM_INODES >> 16) & 0xFF + '0';
-    temp[2] = (NUM_INODES >> 8) & 0xFF + '0';
-    temp[3] = NUM_INODES & 0xFF + '0';
+    char temp[5];
+    temp[0] = ((NUM_INODES / 1000) % 10) + '0';
+    temp[1] = ((NUM_INODES / 100) % 10) + '0';
+    temp[2] = ((NUM_INODES / 10) % 10) + '0';
+    temp[3] = (NUM_INODES % 10) + '0';
+    temp[4] = '\0';
     strncat(INode, temp, 4);
 
     //add type
@@ -30,52 +33,81 @@ char* createINode(FILE* file, char* type, int* block_addr) {
         return INode; //TODO ERROR
     }
 
-    //put first 10 block addresses into INODE
+    //put first 10 block addresses into INODE as integers; 0000 means none
     int i;
-    for(i = 0; i < sizeof(block_addr); i++) {
-        INode[8+i] = (block_addr[i] >> 8) & 0xFF + '0';
-        INode[9+i] = block_addr[i] & 0xFF + '0';
+    char temp2[41];
+    temp2[40] = '\0';
+    for(i = 0; i < 10; i++) {
+        if(i > sizeof(block_addr)/sizeof(int)) {
+            //break;
+            temp2[i * 4] = '0';
+            temp2[(i * 4) + 1] = '0';
+            temp2[(i * 4) + 2] = '0';
+            temp2[(i * 4) + 3] = '0';
+        }
+        else {
+            int j = block_addr[i];
+            temp2[i * 4] = ((j / 1000) % 10) + '0';
+            temp2[(i * 4) + 1] = ((j / 100) % 10) + '0';
+            temp2[(i * 4) + 2] = ((j / 10) % 10) + '0';
+            temp2[(i * 4) + 3] = (j % 10) + '0'; 
+        }
+        
+    }
+    strncat(INode, temp2, 40);
+    if(sizeof(block_addr) / sizeof(int)) {
+
     }
 
+
     return INode;
+}
+
+//grabs first available block
+int findFreeBlock(FILE* disk) {
+    char* buffer = malloc(BLOCK_SIZE);
+    readBlock(disk, 1, buffer);
+    int i;
+    int bits;
+    int block_addr = 0;
+
+    for(i = 0; i < BLOCK_SIZE; i++) {
+        char byte = buffer[i];
+        for(bits = 0; bits < 8; bits++) {
+            if((byte & 0x80) > 0) {
+                char temp = 0x80;
+                temp >>= bits;
+                buffer[i] &= ~temp; //find taken bit and set to 0
+                writeBlock(disk, 1, buffer); //write taken in superblock
+                block_addr = (i * 8) + bits; //set block of address
+                break;
+            }
+            byte = byte << 1;
+        }
+        if(block_addr != 0) {            
+            break;
+        }
+    }
+    free(buffer);
+    return block_addr;
 }
 
 void createFile(FILE* disk, char* type, char* file) {
     //find free block
     //find number of blocks needed to store file rounding up
     int blocks_req = (strlen(file) + BLOCK_SIZE - 1)/ BLOCK_SIZE;
-    char* buffer = malloc(BLOCK_SIZE);
-    readBlock(disk, 1, buffer);
     int* block_addr = calloc(blocks_req, 1);
     int i;
     int j;
-    int bits;
 
     //get the first 1 bit in superblock
     for(j = 0; j < blocks_req; j++) {
-        for(i = 0; i < BLOCK_SIZE; i++) {
-            char byte = buffer[i];
-            for(bits = 0; bits < 8; bits++) {
-                if((byte & 0x80) > 0) {
-                    char temp = 0x80;
-                    temp >>= bits;
-                    buffer[i] &= ~temp; //find taken bit and set to 0
-                    writeBlock(disk, 1, buffer); //write taken in superblock
-                    block_addr[j] = (i * 8) + bits; //set block of address
-                    break;
-                }
-                byte = byte << 1;
-            }
-            if(block_addr[j] != 0) {            
-                break;
-            }
-        }
+        block_addr[j] = findFreeBlock(disk);
         if(block_addr[j] == 0) {
-            printf("DISK FULL\n");
+            printf("FIND BLOCK FAILED, DISK MIGHT BE FULL\n");
             return;
         }
-    }    
-    free(buffer);
+    }
 
     if(debug) {
         for(i = 0; i < blocks_req; i++) {
@@ -84,7 +116,7 @@ void createFile(FILE* disk, char* type, char* file) {
     }
 
     //create INODE
-    char* INode = createINode(disk, type, block_addr);
+    char* INode = createINode(disk, type, block_addr, 0);
     for(i = 0; i < INODE_SIZE; i++) {
         printf("%c", INode[i]);
     }
