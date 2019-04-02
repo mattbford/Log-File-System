@@ -3,15 +3,17 @@
 #include <string.h>
 #include "../disk/disk.h"
 
-//increased INode size to support block addresses as a 4 byte int rather than 2 byte hex
-const int INODE_SIZE = 52;
+//TO_HEX code from: https://stackoverflow.com/questions/4085612/converting-an-int-to-a-2-byte-hex-value-in-c
+#define TO_HEX(i) (i <= 9 ? '0' + i : 'A' - 10 + i)
+
+const int INODE_SIZE = 32;
 const int debug = 1;
 const int BLOCK_SIZE;
 const int NUM_BLOCKS;
 int NUM_INODES = 0;
 
 //int indirect: 0 - not an indirect, 1 - single indirect, 2 - double indirect
-char* createINode(FILE* file, char* type, int* block_addr, int indirect) {
+char* createINode(FILE* disk, char* type, int* block_addr, int indirect) {
     char* INode = (char*)calloc(INODE_SIZE * sizeof(char),1);
 
     //Convert INODE number to 4 byte string
@@ -35,30 +37,44 @@ char* createINode(FILE* file, char* type, int* block_addr, int indirect) {
 
     //put first 10 block addresses into INODE as integers; 0000 means none
     int i;
-    char temp2[41];
-    temp2[40] = '\0';
-    for(i = 0; i < 10; i++) {
-        if(i > sizeof(block_addr)/sizeof(int)) {
-            //break;
-            temp2[i * 4] = '0';
-            temp2[(i * 4) + 1] = '0';
-            temp2[(i * 4) + 2] = '0';
-            temp2[(i * 4) + 3] = '0';
-        }
-        else {
+    char temp2[21];
+    temp2[20] = '\0';
+    int len_block_addr = sizeof(block_addr) / sizeof(int);
+    for(i = indirect * 10; i < 10 * (indirect + 1); i++) {
+        int temp_addr = ((i - (indirect * 10))) * 2;
+        if(i > len_block_addr) {
+            temp2[temp_addr] = '0';
+            temp2[temp_addr+1] = '0';
+        }else {
             int j = block_addr[i];
-            temp2[i * 4] = ((j / 1000) % 10) + '0';
-            temp2[(i * 4) + 1] = ((j / 100) % 10) + '0';
-            temp2[(i * 4) + 2] = ((j / 10) % 10) + '0';
-            temp2[(i * 4) + 3] = (j % 10) + '0'; 
-        }
+            temp2[temp_addr] = TO_HEX(((j & 0xF0) >> 4));
+            temp2[temp_addr + 1] = TO_HEX((j & 0x0F));
+        }        
+    }
+    strncat(INode, temp2, 20);
+
+    //build indirects
+    /*if(indirect == 0 || indirect == 2) {
+        char* single_indirect_INode;
         
-    }
-    strncat(INode, temp2, 40);
-    if(sizeof(block_addr) / sizeof(int)) {
+        if(len_block_addr > 10) {
+            int addr = findFreeBlock(disk);
+            single_indirect_INode = createINode(disk, type, block_addr, 1);
+            
+        }
+        if(indirect == 0) {
+            char* double_indirect_INode;
+            if(len_block_addr > 20) {
+                int addr = findFreeBlock(disk);
+                double_indirect_INode = createINode(disk, type, block_addr, 2);
+            }
+            else {
+                
+            }
+        }    
+    }*/
 
-    }
-
+    strncat(INode, "0000", 4);
 
     return INode;
 }
