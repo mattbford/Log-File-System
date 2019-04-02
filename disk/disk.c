@@ -2,6 +2,7 @@
 #include <stdlib.h>
 
 const int BLOCK_SIZE = 512;
+const int NUM_INODES = 4096;
 const int NUM_BLOCKS = 4096;
 
 void writeBlock(FILE* disk, int block, char* data) {
