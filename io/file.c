@@ -107,7 +107,7 @@ int findFreeBlock(FILE* disk) {
             break;
         }
     }
-    free(buffer);
+    //free(buffer);
     return block_addr;
 }
 
@@ -132,7 +132,7 @@ int findFreeInode(FILE* disk, int INode_Addr) {
                     buffer[j] = temp[0];
                     buffer[j+1] = temp[1];
                     writeBlock(disk, i, buffer);
-                    free(buffer);
+                    //free(buffer);
                     return counter;
                 }
             }            
@@ -157,14 +157,14 @@ void findINodeAddr(FILE* disk, char* Addr_Buffer, int INode_Num) {
     Addr_Buffer[0] = buffer[INode_Num];
     Addr_Buffer[1] = buffer[INode_Num + 1];
     Addr_Buffer[2] = '\0';
-    free(buffer);
+    //free(buffer);
 }
 
 void createFile(FILE* disk, char* type, char* file, char* name) {
     //find free block
     //find number of blocks needed to store file rounding up
     int blocks_req = (strlen(file) + BLOCK_SIZE - 1)/ BLOCK_SIZE;
-    int* block_addr = calloc(blocks_req, 1);
+    int* block_addr = malloc(blocks_req);
     int i;
     int j;
 
@@ -211,8 +211,9 @@ void createFile(FILE* disk, char* type, char* file, char* name) {
     //read blocks 2-9 and find location to write mapping
     //INodes take 2 bytes
     //int INode_block = (NUM_INODES / (BLOCK_SIZE / 2)) + 2;
-    
-    //write to appropriate directory - root for now (block 10)
+
+    //write filename and inode number to appropriate directory - root for now (block 10)
+    //TODO Sub-Directories
     INode_Num += '0';
     if(strcmp(name, "root") != 0) {
         char* dir = malloc(BLOCK_SIZE);
@@ -238,13 +239,23 @@ void createFile(FILE* disk, char* type, char* file, char* name) {
             }*/
         }
         writeBlock(disk, 10, dir);
-        free(dir);
+        //free(dir);
     }
     else {
         printf("CREATE: Cannot make file named 'root'\n");
         return;
     }
 
+    //write file data
+    char* temp;
+    for(i = 0; i < blocks_req; i++) {
+        temp = malloc(BLOCK_SIZE);
+        for(j = 0; j < (strlen(file) - (i * BLOCK_SIZE)); j++) {
+            temp[j] = file[j + (i * BLOCK_SIZE)];
+        }
+        writeBlock(disk, block_addr[i], temp);
+        //free(temp);
+    }
 }
 
 void writeToFile(FILE* disk, char* data, char* file_name) {
@@ -263,10 +274,10 @@ void readFile(FILE* disk, char* file_name) {
     for(i = 0; i < BLOCK_SIZE; i+=32) {
         if(dir[i] == 0x00) {
             printf("READ: file: %s does not exist in current directory\n", file_name);
-            free(dir);
+            //free(dir);
             return;
         }
-        if(dir[i] != 0x00) {
+        else {
             j = 0;
             char* temp = malloc(strlen(file_name));
             while(j < strlen(file_name)) {
@@ -275,21 +286,21 @@ void readFile(FILE* disk, char* file_name) {
             }
             if(strncmp(temp, file_name, strlen(file_name)) == 0) {
                 INode_Num = dir[i] - '0';
-                free(temp);
+                //free(temp);
                 break;
             }
-            free(temp);
+            //free(temp);
         }
 
         if(i == BLOCK_SIZE-32) {
             printf("READ: file: %s does not exist in current directory\n", file_name);
-            free(dir);
+            //free(dir);
             return;
         }
     }
 
     //get Inode address from inode number
-    free(dir);
+    //free(dir);
     char INode_Addr[3];    
     findINodeAddr(disk, INode_Addr, INode_Num);
     int addr = (int)strtol(INode_Addr, NULL, 16);    //hex to int
@@ -325,7 +336,7 @@ void readFile(FILE* disk, char* file_name) {
         printf("READ: number of blocks: %d\n", num_blocks);*/
     }
 
-    free(INode);
+    //free(INode);
 
     char* open_file = malloc(BLOCK_SIZE * num_blocks);
     char* open_block;
@@ -334,9 +345,10 @@ void readFile(FILE* disk, char* file_name) {
         readBlock(disk, blocks[i], open_block);
         printf("READ: openblock: %s\n", open_block);
         strncat(open_file, open_block, BLOCK_SIZE);
-        free(open_block);
+        //free(open_block);
     }
     printf("Read File:\n%s\n", open_file);
+    //free(open_file);
     
 }
 
