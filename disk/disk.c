@@ -22,7 +22,7 @@ void createDisk(FILE* disk) {
     // Create Superblock 1111 - magic number
     char* superInit = "123440964096";
     writeBlock(disk, 0, superInit);
-    // Create Free Block Vector taking root directory into account
+    // Create Free Block Vector takes into account root dir at block 10
     char freeBlock[512] = { 0b00000000, 0b00011111, [2 ... 511] = 0b11111111 };       
     writeBlock(disk, 1, freeBlock);
 
