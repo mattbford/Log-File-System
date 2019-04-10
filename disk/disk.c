@@ -19,8 +19,8 @@ void createDisk(FILE* disk) {
     char* init = calloc(BLOCK_SIZE*NUM_BLOCKS, 1);
     fwrite(init, BLOCK_SIZE*NUM_BLOCKS, 1, disk);
 
-    // Create Superblock 1111 - magic number
-    char* superInit = "123440964096";
+    // Create Superblock 1234 - magic number
+    char* superInit = "123440962048";
     writeBlock(disk, 0, superInit);
     // Create Free Block Vector takes into account root dir at block 10
     char freeBlock[512] = { 0b00000000, 0b00011111, [2 ... 511] = 0b11111111 };       

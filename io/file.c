@@ -263,14 +263,6 @@ void createFile(FILE* disk, char* type, char* file, char* name) {
 }
 
 void writeToFile(FILE* disk, char* data, char* file_name) {
-    //
-}
-
-void deleteFile(FILE* disk, char* data, char* file_name) {
-
-}
-
-void readFile(FILE* disk, char* file_name) {
     //need to update for subdirectories
     char* dir = malloc(BLOCK_SIZE);
     readBlock(disk, 10, dir);
@@ -304,6 +296,144 @@ void readFile(FILE* disk, char* file_name) {
             printf("READ: file: %s does not exist in current directory\n", file_name);
             free(dir);
             return;
+        }
+    }
+    //get Inode address from inode number
+    free(dir);
+    char INode_Addr[3];    
+    findINodeAddr(disk, INode_Addr, INode_Num);
+    int addr = (int)strtol(INode_Addr, NULL, 16);    //hex to int
+
+    if(debug == 1) {
+        printf("READ: INODE NUM: %d\n", INode_Num);      
+        printf("READ: INODE ADDR: %s\n", INode_Addr);
+    }
+
+    //get inode from inode address
+    char* INode = malloc(BLOCK_SIZE);
+    readBlock(disk, addr, INode);
+    int blocks[10] = { 0 };
+    int num_blocks = 0;
+
+    //get number of blocks and their addresses from INode bytes 8 - 27
+    //TODO handle indirects
+    for(i = 8; i < 27; i += 2) {
+        if(INode[i] == '0' && INode[i+1] == '0') {
+            break;
+        }
+        else {
+            char temp[3] = { INode[i], INode[i+1], '\0' };
+            blocks[(i-8)/2] = (int)strtol(temp, NULL, 16);
+            num_blocks++;
+        }
+    }
+    
+    if(debug == 1) {
+        /*for(i = 0; i < 10; i++) {
+            printf("READ: data blocks: %d\n", blocks[i]);
+        }
+        printf("READ: number of blocks: %d\n", num_blocks);*/
+    }
+
+    //write data to existing blocks as well as creating new blocks
+    int blocks_req = (strlen(data) + BLOCK_SIZE - 1)/ BLOCK_SIZE;
+    printf("WRITE: req: %d num: %d\n", blocks_req, num_blocks);
+    char* temp;
+
+    if(blocks_req <= num_blocks) {
+        for(i = 0 ; i < num_blocks; i++) {
+            temp = calloc(BLOCK_SIZE, 1);
+            for(j = 0; j < BLOCK_SIZE; j++) {
+                //TODO delete unnessary blocks - currently inputs some garbage values if smaller
+                if(j >= (strlen(data) - (i * BLOCK_SIZE))) {
+                    break;
+                }
+                temp[j] = data[j + (i * BLOCK_SIZE)];
+            }
+            //printf("WRITE: block: %d data: %s\n", blocks[i], temp);
+            writeBlock(disk, blocks[i], temp);
+            free(temp);
+        }
+    }
+    else { //need to create more blocks TODO handle indirects
+        //allocate new blocks
+        int new_blocks = blocks_req - num_blocks;
+        for(i = 0; i < new_blocks; i++) { //currently assumes less than 10
+            blocks[i + num_blocks] = findFreeBlock(disk);
+        }
+        //write data to all blocks (new and old)
+        for(i = 0 ; i < blocks_req; i++) {
+            temp = calloc(BLOCK_SIZE, 1);
+            for(j = 0; j < BLOCK_SIZE; j++) {
+                if(j >= (strlen(data) - (i * BLOCK_SIZE))) {
+                    break;
+                }
+                temp[j] = data[j + (i * BLOCK_SIZE)];
+            }
+            //printf("WRITE: block: %d data: %s\n", blocks[i], temp);
+            writeBlock(disk, blocks[i], temp);
+            free(temp);
+        }
+
+        //add new addresses to INODE
+        for(i = 8 + (new_blocks * 2); i < 27; i += 2) {
+            int z = ((i - (8 + (new_blocks * 2)))/2) + new_blocks; //Gross but works
+            if(blocks[z] == 0) {
+                INode[i] = '0';
+                INode[i+1] = '0';
+            }
+            else {
+                INode[i] = TO_HEX(((blocks[z] & 0xF0) >> 4));
+                INode[i+1] = TO_HEX((blocks[z] & 0x0F));
+            }
+        }
+        writeBlock(disk, addr, INode);
+        
+    }
+    if(debug == 1) {
+        printf("WRITE: INode: %s\n", INode);
+    }    
+    free(INode);
+}
+
+void deleteFile(FILE* disk, char* data, char* file_name) {
+    
+}
+
+char* readFile(FILE* disk, char* file_name) {
+    //need to update for subdirectories
+    char* dir = malloc(BLOCK_SIZE);
+    readBlock(disk, 10, dir);
+    int i;
+    int j;
+    int INode_Num;
+
+    //check all filenames in current directory and get INODE_NUM if it exists
+    for(i = 0; i < BLOCK_SIZE; i+=32) {
+        if(dir[i] == 0x00) {
+            printf("READ: file: %s does not exist in current directory\n", file_name);
+            free(dir);
+            return '\0';
+        }
+        else {
+            j = 0;
+            char* temp = malloc(strlen(file_name));
+            while(j < strlen(file_name)) {
+                temp[j] = dir[i + j + 1];
+                j++;
+            }
+            if(strncmp(temp, file_name, strlen(file_name)) == 0) {
+                INode_Num = dir[i] - '0';
+                free(temp);
+                break;
+            }
+            free(temp);
+        }
+
+        if(i == BLOCK_SIZE-32) {
+            printf("READ: file: %s does not exist in current directory\n", file_name);
+            free(dir);
+            return '\0';
         }
     }
 
@@ -344,20 +474,20 @@ void readFile(FILE* disk, char* file_name) {
         printf("READ: number of blocks: %d\n", num_blocks);*/
     }
 
+
+    //read the file block by block
     free(INode);
 
-    char* open_file = malloc(BLOCK_SIZE * num_blocks);
+    char* open_file = calloc(BLOCK_SIZE * num_blocks, 1);
     char* open_block;
     for(i = 0; i < num_blocks; i++) {
         open_block = malloc(BLOCK_SIZE);
         readBlock(disk, blocks[i], open_block);
-        printf("READ: openblock: %s\n", open_block);
         strncat(open_file, open_block, BLOCK_SIZE);
         free(open_block);
     }
-    printf("Read File:\n%s\n", open_file);
-    free(open_file);
     
+    return open_file;    
 }
 
 int main (int argc, char* argv[]) {
@@ -377,6 +507,14 @@ int main (int argc, char* argv[]) {
     printf("%lu\n", strlen(file_con));    
     createFile(disk, "0000", file_con, "foobar");
     createFile(disk, "0000", file_con, "foobar2");
-    readFile(disk, "foobar2");
+    
+    char* newfoobar = "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";
+    writeToFile(disk, newfoobar, "foobar2");
+
+    char* foobar2 = readFile(disk, "foobar2");
+    if(foobar2 != '\0') {
+        printf("Read File:\n%s\n", foobar2);
+        free(foobar2);
+    }
     fclose(disk);
 }
