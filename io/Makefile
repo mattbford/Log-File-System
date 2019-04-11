@@ -1,16 +1,15 @@
-# filesystem make file
 DISK = ../disk
 APPS = ../apps
-TARGETS1 = $(DISK)/disk file $(APPS)/test1
-TARGETS2 = $(DISK)/disk file $(APPS)/test2
-OBJS1 = file.o $(DISK)/disk.o $(APPS)/test1.o 
-OBJS2 = file.o $(DISK)/disk.o $(APPS)/test2.o
-CFLAGS += -g -std=gnu11
-test1: $(TARGETS1)
-$(TARGETS1): $(OBJS1)
 
-test2: $(TARGETS2)
-$(TARGETS2): $(OBJS2)
-
-clean:
-	rm -f $(TARGETS1) $(OBJS1) $(APPS)/test2.o $(APPS)/test2
+test1: $(APPS)/test1.o file.o $(DISK)/disk.o
+	gcc -g -std=gnu11 -o $(APPS)/test1 $(APPS)/test1.o file.o $(DISK)/disk.o
+test2: $(APPS)/test2.o file.o $(DISK)/disk.o
+	gcc -g -std=gnu11 -o $(APPS)/test2 $(APPS)/test2.o file.o $(DISK)/disk.o
+disk.o: $(DISK)/disk.c
+	gcc -g -std=gnu11 -c $(DISK)/disk.c
+file.o: file.c
+	gcc -g -std=gnu11 -c file.c
+test1.o: $(APPS)/test1.c
+	gcc -g -std=gnu11 -c $(APPS)/test1.c
+test2.o: $(APPS)/test2.c
+	gcc -g -std=gnu11 -c $(APPS)/test2.c
