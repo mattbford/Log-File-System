@@ -598,16 +598,17 @@ void deleteFile(FILE* disk, char* file_name, char* path) {
     int i;
     int j;
     int INode_Num;
+    int dir_addr = 10;
     if(strcmp(path, "root") != 0) {
-        int addr = findDirectoryAddr(disk, path);
-        if(addr == -1) {
+        dir_addr = findDirectoryAddr(disk, path);
+        if(dir_addr == -1) {
             printf("DELETE: failed %s does not exist\n", path);
             return;
         }
-        readBlock(disk, addr, dir);
+        readBlock(disk, dir_addr, dir);
     }
     else {        
-        readBlock(disk, 10, dir);
+        readBlock(disk, dir_addr, dir);
     }
 
     //check all filenames in current directory and get INODE_NUM if it exists
@@ -620,6 +621,11 @@ void deleteFile(FILE* disk, char* file_name, char* path) {
         }
         if(strncmp(temp, file_name, strlen(file_name)) == 0) {
             INode_Num = dir[i] - '0';
+            //clear data out of directory
+            for(j = 0; j < strlen(file_name) + 1; j++) {
+                dir[i+j] = 0;
+            }
+            writeBlock(disk, dir_addr, dir);
             free(temp);
             break;
         }
@@ -675,6 +681,9 @@ void deleteFile(FILE* disk, char* file_name, char* path) {
         free(dir);
     }
 
+    //delete from parent directory
+
+
     int blocks[10] = { 0 };
     int num_blocks = 0;
 
@@ -719,6 +728,23 @@ void deleteFile(FILE* disk, char* file_name, char* path) {
     writeBlock(disk, 1, buffer);
     free(buffer);
 
+    //INode mapping blocks 2-9
+    int map_block = INode_Num / (BLOCK_SIZE / 2) + 2;
+    buffer = malloc(BLOCK_SIZE);
+    readBlock(disk, map_block, buffer);
+    int temp_num = INode_Num - (map_block * BLOCK_SIZE / 2);
+    temp_num *= 2;
+    buffer[temp_num] = 0;
+    buffer[temp_num+1] = 0;
+    writeBlock(disk, map_block, buffer);
+    free(buffer);    
+
+    //clear INode block
+    buffer = calloc(BLOCK_SIZE, 1);
+    writeBlock(disk, addr, buffer);
+    free(buffer);
+    free(INode);
+
 }
 
 int main (int argc, char* argv[]) {
@@ -740,7 +766,7 @@ int main (int argc, char* argv[]) {
     createFile(disk, "0000", file_con, "foobar", path);
     createFile(disk, "1111", "", "documents", path);
     //char path2[] = "root/documents";
-    //createFile(disk, "0000", file_con, "foobar2", path2);
+    createFile(disk, "0000", file_con, "foobar2", path);
 
    // char* newfoobar = "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";
     //writeToFile(disk, newfoobar, "foobar2", path2);
@@ -751,5 +777,6 @@ int main (int argc, char* argv[]) {
         //free(foobar2);
     //}
     deleteFile(disk, "documents", path);
+    createFile(disk, "0000", "", "idk", path);
     fclose(disk);
 }
