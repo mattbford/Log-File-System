@@ -672,6 +672,7 @@ void deleteFile(FILE* disk, char* file_name, char* path) {
                 return;
             }
         }
+        free(dir);
     }
 
     int blocks[10] = { 0 };
@@ -689,6 +690,35 @@ void deleteFile(FILE* disk, char* file_name, char* path) {
             num_blocks++;
         }
     }
+
+    if(debug == 1) {
+        printf("DELETE: num blocks: %d\n", num_blocks);
+    }
+
+    //overwrite all data in blocks to null
+    for(i = 0; i < num_blocks; i++) {
+        char* temp = calloc(BLOCK_SIZE, 1);
+        writeBlock(disk, blocks[i], temp);
+        free(temp);
+    }
+
+    //write blocks as available in mapping
+    char* buffer = malloc(BLOCK_SIZE);
+    readBlock(disk, 1, buffer);
+    for(i = 0 ; i < num_blocks; i++) {
+        int byte_num = blocks[i] / 8;
+        int bit_num = blocks[i] % 8;
+        char temp = (1 << (8-bit_num));
+        buffer[byte_num] |= temp;
+        
+        if(debug == 1) {
+            printf("DELETE: byte_num: %d\n", byte_num);
+            printf("DELETE: buffer 0x%02x\n", buffer[byte_num]);
+        }
+    }
+    writeBlock(disk, 1, buffer);
+    free(buffer);
+
 }
 
 int main (int argc, char* argv[]) {
