@@ -160,35 +160,108 @@ void findINodeAddr(FILE* disk, char* Addr_Buffer, int INode_Num) {
     free(buffer);
 }
 
-char* readFile(FILE* disk, char* file_name) {
-    //need to update for subdirectories
+int findDirectoryAddr(FILE* disk, char* path) {
+    // break up path
+    //finds proper directory
     char* dir = malloc(BLOCK_SIZE);
     readBlock(disk, 10, dir);
     int i;
     int j;
+    int n = 0;
     int INode_Num;
 
-    //check all filenames in current directory and get INODE_NUM if it exists
-    for(i = 0; i < BLOCK_SIZE; i+=32) {
-        if(dir[i] == 0x00) {
-            printf("READ: file: %s does not exist in current directory\n", file_name);
-            free(dir);
-            return '\0';
-        }
-        else {
-            j = 0;
-            char* temp = malloc(strlen(file_name));
-            while(j < strlen(file_name)) {
-                temp[j] = dir[i + j + 1];
-                j++;
+    char temp_path[strlen(path)]; // to prevent altering of path
+    strcpy(temp_path, path);
+    char** steps = NULL;
+    const char s[2] = "";
+    char* token = strtok(temp_path, s);
+    
+    while (token != NULL) {
+        if(strcmp(token, "root") != 0) {
+            steps = realloc(steps, sizeof(char*) * ++n);
+            if(steps == 0) {
+                printf("READ: Realloc Failed\n");
+                exit (-1);
             }
-            if(strncmp(temp, file_name, strlen(file_name)) == 0) {
+            steps[n-1] = token;
+        }
+        token = strtok(NULL, s);
+    }
+
+    //run through directories
+    for(j = 0; j < n; j++) {
+        for(i = 0; i < BLOCK_SIZE; i+=32) {
+            int z = 0;
+            char* temp = malloc(strlen(steps[j]));
+            while(z < strlen(steps[j])) {
+                temp[z] = dir[i + z + 1];
+                z++;
+            }
+            if(strncmp(temp, steps[j], strlen(steps[j])) == 0) {
                 INode_Num = dir[i] - '0';
                 free(temp);
                 break;
             }
             free(temp);
+
+            if(i == BLOCK_SIZE-32) {
+                printf("FINDDIRADDR: directory: %s does not exist in current directory\n", steps[j]);
+                free(dir);
+                return -1;
+            }
         }
+        free(dir);
+
+        //get inode address from inode number
+        char INode_Addr[3];    
+        findINodeAddr(disk, INode_Addr, INode_Num);
+        int addr = (int)strtol(INode_Addr, NULL, 16);    //hex to int
+
+        //get inode from inode address
+        char* INode = malloc(BLOCK_SIZE);
+        readBlock(disk, addr, INode);
+
+        //get first block from inode (directories are only 1 block large)
+        char temp[3] = { INode[8], INode[9], '\0' };
+        int block_addr = (int)strtol(temp, NULL, 16);
+        return block_addr;
+    }
+}
+
+char* readFile(FILE* disk, char* file_name, char* path) {
+    //finds proper directory
+    char* dir = malloc(BLOCK_SIZE);
+    int i;
+    int j;
+    int INode_Num;
+
+    if(strcmp(path, "root") != 0) {
+        int addr = findDirectoryAddr(disk, path);
+        if(addr == -1) {
+            printf("READ: failed %s does not exist\n", path);
+            return '\0';
+        }
+        dir = malloc(BLOCK_SIZE);
+        readBlock(disk, addr, dir);
+    }
+    else {        
+        readBlock(disk, 10, dir);
+    }
+
+    //check all filenames in current directory and get INODE_NUM if it exists
+    for(i = 0; i < BLOCK_SIZE; i+=32) {
+        j = 0;
+        char* temp = malloc(strlen(file_name));
+        while(j < strlen(file_name)) {
+            temp[j] = dir[i + j + 1];
+            j++;
+        }
+        if(strncmp(temp, file_name, strlen(file_name)) == 0) {
+            INode_Num = dir[i] - '0';
+            free(temp);
+            break;
+        }
+        free(temp);
 
         if(i == BLOCK_SIZE-32) {
             printf("READ: file: %s does not exist in current directory\n", file_name);
@@ -256,7 +329,10 @@ void createFile(FILE* disk, char* type, char* file, char* name, char* path) {
         printf("CREATE: Cannot make file named 'root'\n");
         return;
     }
-
+    if(strchr(name, '/') != NULL) {
+        printf("CREATE: Cannot make file with '/' in its name\n");
+        return;
+    }
     //find free block
     //find number of blocks needed to store file rounding up
     int blocks_req = (strlen(file) + BLOCK_SIZE)/ BLOCK_SIZE;
@@ -311,22 +387,41 @@ void createFile(FILE* disk, char* type, char* file, char* name, char* path) {
     //write filename and inode number to appropriate directory - root for now (block 10)
     //TODO Sub-Directories
     INode_Num += '0';
-    char* dir;
-    if(strcmp(path, "root/") != 0) {
-        // break up path
+    /*char* dir;
+    char temp_path[strlen(path)]; // to prevent altering of path
+    strcpy(temp_path, path);
+    if(strcmp(path, "root") != 0) {
+        // get last name from path to read as the directory
         const char s[2] = "/";
-        char* token = strtok(path, s);
+        char* token = strtok(temp_path, s);
         
         while (token != NULL) {
             printf("token: %s\n", token);
             if(strcmp(token, "root") != 0) {
-                dir = readFile(disk, token);
+                dir = token;
             }
             token = strtok(NULL, s);
         }
+        int n = strlen(path) - strlen(dir);
+        char read_path[n];
+        strncpy(read_path, path, n-1);
+        read_path[n-1] = '\0';
+        dir = readFile(disk, dir, read_path);
     }
     else {
         dir = malloc(BLOCK_SIZE);
+        readBlock(disk, 10, dir);
+    }*/
+    char* dir = malloc(BLOCK_SIZE);
+    if(strcmp(path, "root") != 0) {
+        int addr = findDirectoryAddr(disk, path);
+        if(addr == -1) {
+            printf("CREATE: failed %s does not exist\n", path);
+            return;
+        }
+        readBlock(disk, addr, dir);
+    }
+    else {        
         readBlock(disk, 10, dir);
     }
     for(i = 0; i < BLOCK_SIZE; i+=32) {
@@ -366,6 +461,10 @@ void createFile(FILE* disk, char* type, char* file, char* name, char* path) {
             writeBlock(disk, block_addr[i], temp);
             free(temp);
         }
+    }
+    else {
+        char* temp = calloc(BLOCK_SIZE, 1);
+        writeBlock(disk, block_addr[0], temp);
     }
     
 }
@@ -523,19 +622,19 @@ int main (int argc, char* argv[]) {
 
     char* file_con = "Gt85LeGhaEs7iGp7khXXrMMk08KFNBJhVroxE42rv6uEHSUBEjy9OHLhdj0lMFyHywAhJgz0XLky9PDUDFrPin7i6W5wAlQ6V53fUExBNkK9VNzFhgwG3ajig9ph9FhhCIeeA5UmsFD6Qnt8zREmAWFGO7qCJUwcCfrO8plpapGTC7apP2lGiQkj1sypu6WRcJFNidIcNTvDu7nJQJngUr9j7mye81iCQP1OnIunkV7Ho8rLyC5ZOPx3y9oY0XYtzIQkfRdFRwIHwVkXBSAq0dw8JUB8if6OAyC5bIEZiqnku7MwMuEo5a2k9Im3STJRzNwwsPjiiT9470DWqRVvMVBYnQDnciD0iIcdoPJhr0phzAhSCfbrEKYbeAD64UTBeXCRowwcrWKaO95GFI0r0pyCo6arOI3BgXVOH7mVYvMRQ7oF8R10Vauv7iwuCxJ4fE9gXwIG80uLAw35NIUz1BC39yobFehFfUMc05cBirZjWN6HcOh7jzOuPUwfDs4GgGR5IOWmCmE9C1Cr7ryCy6D6coazAE1Jr8IzmKkBIG7yyl5n42baolbQhO0bg7IZ9tg74h2ZrSAAmXhYNSM8NCSiRoD398r3A74ubVKFmdy2u7S3SrVWPpw0ZO3C8w5kGXfrAcGRXK4rYD1YwRkgDRHhI0OxQm33NxSzVqWQrUKQQnNE9x9Sxp6bLtzozy6Jl2Bjp4601mrDr9YF4IvtsfmGjYSekLqWDKzoR9QdPgUyV4CA4UoiS1AnZpDGDGQmwVPPl9O3vNsJ4zl9xs5txQ3xWuc2ZOtJJCymHvBeAiz7uy5WgjND1EZ1HbCvpScilubojqX89EqFllK76bnDK1rearuCZRWuEhdEkyzqEg2Ri3Inf5xT4V1bhZ6iKsPOT3K5RpKVGmpf43VFqZgmDCCMShPstalFVkYwdJMbaxctELcuX7IuzoGzN3d9xVeJFLiMTdHjeggz185NTaIJGsFqQON5CWKMdIdmkuymxJv0ICMCmi6LEGcw3hgBkbNCrQBGHeICHdQoRvjuX5HvYTkjIDva8lZz1SZOANdUF6kkGZ07HXWm9114DHelZSf2YyDev95YFZPC1xO1xWKgX0JPdIV5xjYGIj1BzdBfcSgU00I8SyvzfJRHPdRDv6dCu1Gr7CW0ZJtpjDNkwpHbRao0laJrOiNhURACtZy8Us3cUxthw7J5g9YX3DTpCrpYwjaQOOLGWfZaTYwA0ixPCypAzjlqMqF6FOBr7vHnbifYijC76eZoezSsf28zejLahY29ry3mTit3CM3FPD4hVVqvaP6hU5JfDALzh1ATGfvLutBAD0VJp7UrTtSTazeALfnN7zOwN5M475sNYhcbhUsIi5e7bPXQiLmJAj4Gt0dFCJ18kNvfNADRZaOyNg3jx4Wqks6vQcL9qSH6a9tADP9KXQLqZagXkivtus4UGzvHyTHp6yPZ1kHnVzRXW3XvNMXf7wSdrCB9jYWiab18i9BXbduS";
     printf("%lu\n", strlen(file_con));
-    char path[] = "root/";
+    char path[] = "root";
     createFile(disk, "0000", file_con, "foobar", path);
     createFile(disk, "1111", "", "documents", path);
-    char path2[] = "root/documents/";
+    char path2[] = "root/documents";
     createFile(disk, "0000", file_con, "foobar2", path2);
 
     //char* newfoobar = "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";
     //writeToFile(disk, newfoobar, "foobar2");
 
-    //char* foobar2 = readFile(disk, "foobar2");
-    //if(foobar2 != '\0') {
-        //printf("Read File:\n%s\n", foobar2);
-        //free(foobar2);
-    //}
+    char* foobar2 = readFile(disk, "foobar2", "root/documents");
+    if(foobar2 != '\0') {
+        printf("Read File:\n%s\n", foobar2);
+        free(foobar2);
+    }
     fclose(disk);
 }
