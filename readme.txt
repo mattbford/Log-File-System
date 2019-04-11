@@ -72,3 +72,5 @@ Robustness(kinda):
     We can only ever satisfy two of those aspects. I chose durability and cost(my time and sanity) and as a result the system definitely isn't
     very efficient.
 
+The tests currently don't work. CreateFile is not adding the file data to the disk for some reason. However if the test code is copied into 
+file.c's main it works correctly. 
