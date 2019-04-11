@@ -225,7 +225,9 @@ int findDirectoryAddr(FILE* disk, char* path) {
         char temp[3] = { INode[8], INode[9], '\0' };
         int block_addr = (int)strtol(temp, NULL, 16);
         if(j == n-1) {
-            printf("FINDDIRADDR: %d\n", block_addr);
+            if(debug == 1) {
+                printf("FINDDIRADDR: %d\n", block_addr);
+            }
             return block_addr;
         }
         else {
@@ -307,10 +309,10 @@ char* readFile(FILE* disk, char* file_name, char* path) {
     }
     
     if(debug == 1) {
-        /*for(i = 0; i < 10; i++) {
+        for(i = 0; i < 10; i++) {
             printf("READ: data blocks: %d\n", blocks[i]);
         }
-        printf("READ: number of blocks: %d\n", num_blocks);*/
+        printf("READ: number of blocks: %d\n", num_blocks);
     }
 
 
@@ -320,24 +322,27 @@ char* readFile(FILE* disk, char* file_name, char* path) {
     char* open_file = calloc(BLOCK_SIZE * num_blocks, 1);
     char* open_block;
     for(i = 0; i < num_blocks; i++) {
-        open_block = malloc(BLOCK_SIZE);
+        open_block = calloc(BLOCK_SIZE,1);
         readBlock(disk, blocks[i], open_block);
-        strncat(open_file, open_block, BLOCK_SIZE);
+        if(debug == 1) {
+            printf("open_block %d: %s\n\n", i, open_block);
+        }
+        strncat(open_file, open_block, strlen(open_block));
         free(open_block);
     }
     
     return open_file;    
 }
 
-void createFile(FILE* disk, char* type, char* file, char* name, char* path) {
+int createFile(FILE* disk, char* type, char* file, char* name, char* path) {
     
     if(strcmp(name, "root") == 0) {
         printf("CREATE: Cannot make file named 'root'\n");
-        return;
+        return -1;
     }
     if(strchr(name, '/') != NULL) {
         printf("CREATE: Cannot make file with '/' in its name\n");
-        return;
+        return -1;
     }
     //find free block
     //find number of blocks needed to store file rounding up
@@ -345,7 +350,7 @@ void createFile(FILE* disk, char* type, char* file, char* name, char* path) {
 
     if(blocks_req > 10) {
         printf("CREATE: Cannot allocate a file larger than 10 blocks because that would be to reasonable.\n");
-        return;
+        return -1;
     }
     int* block_addr = calloc(blocks_req, 1);
     int i;
@@ -356,7 +361,7 @@ void createFile(FILE* disk, char* type, char* file, char* name, char* path) {
         block_addr[j] = findFreeBlock(disk);
         if(block_addr[j] == 0) {
             printf("CREATE: FIND BLOCK FAILED, DISK MIGHT BE FULL\n");
-            return;
+            return -1;
         }
     }
 
@@ -369,15 +374,17 @@ void createFile(FILE* disk, char* type, char* file, char* name, char* path) {
     //create INODE
     int INode_Addr = findFreeBlock(disk);
     int INode_Num = findFreeInode(disk, INode_Addr);
-    printf("CREATE: INODE NUM: %d\n", INode_Num);
-    printf("CREATE: INODE ADDR: %d\n", INode_Addr);
+    if(debug == 1) {
+        printf("CREATE: INODE NUM: %d\n", INode_Num);
+        printf("CREATE: INODE ADDR: %d\n", INode_Addr);
+    }    
     char* INode;
     if(INode_Num != -1) {
         INode = createINode(disk, type, block_addr, INode_Num, 0);
     }
     else {
         printf("CREATE: Failed to Create File, INode Map full");
-        return;
+        return -1;
     }    
 
     if(debug == 1) {
@@ -389,6 +396,7 @@ void createFile(FILE* disk, char* type, char* file, char* name, char* path) {
     }
     else {
         printf("CREATE: Failed to create file, Disk Full");
+        return -1;
     }
 
     //read blocks 2-9 and find location to write mapping
@@ -403,7 +411,7 @@ void createFile(FILE* disk, char* type, char* file, char* name, char* path) {
         dir_addr = findDirectoryAddr(disk, path);
         if(dir_addr == -1) {
             printf("CREATE: failed %s does not exist\n", path);
-            return;
+            return -1;
         }
         readBlock(disk, dir_addr, dir);
     }
@@ -421,7 +429,7 @@ void createFile(FILE* disk, char* type, char* file, char* name, char* path) {
         }
         else if (i == BLOCK_SIZE-32) {
             printf("CREATE: Directory Full, could not create %s\n", name);
-            return;
+            return -1;
         }
     }
     if(debug == 1) {
@@ -437,7 +445,7 @@ void createFile(FILE* disk, char* type, char* file, char* name, char* path) {
     if(type == "0000") {
         char* temp;
         for(i = 0; i < blocks_req; i++) {
-            temp = malloc(BLOCK_SIZE);
+            temp = calloc(BLOCK_SIZE, 1);
             for(j = 0; j < BLOCK_SIZE; j++) {
                 if(j >= strlen(file) - (i * BLOCK_SIZE)) {
                     break;
@@ -452,10 +460,10 @@ void createFile(FILE* disk, char* type, char* file, char* name, char* path) {
         char* temp = calloc(BLOCK_SIZE, 1);
         writeBlock(disk, block_addr[0], temp);
     }
-    
+    return 0;
 }
 
-void writeToFile(FILE* disk, char* data, char* file_name, char* path) {
+int writeToFile(FILE* disk, char* data, char* file_name, char* path) {
     //need to update for subdirectories
     char* dir = malloc(BLOCK_SIZE);
     int i;
@@ -465,7 +473,7 @@ void writeToFile(FILE* disk, char* data, char* file_name, char* path) {
         int addr = findDirectoryAddr(disk, path);
         if(addr == -1) {
             printf("WRITE: failed %s does not exist\n", path);
-            return;
+            return -1;
         }
         readBlock(disk, addr, dir);
     }
@@ -492,7 +500,7 @@ void writeToFile(FILE* disk, char* data, char* file_name, char* path) {
         if(i == BLOCK_SIZE-32) {
             printf("READ: file: %s does not exist in current directory\n", file_name);
             free(dir);
-            return;
+            return -1;
         }
     }
     //get Inode address from inode number
@@ -591,9 +599,10 @@ void writeToFile(FILE* disk, char* data, char* file_name, char* path) {
         printf("WRITE: INode: %s\n", INode);
     }    
     free(INode);
+    return 0;
 }
 
-void deleteFile(FILE* disk, char* file_name, char* path) {
+int deleteFile(FILE* disk, char* file_name, char* path) {
     char* dir = malloc(BLOCK_SIZE);
     int i;
     int j;
@@ -603,7 +612,7 @@ void deleteFile(FILE* disk, char* file_name, char* path) {
         dir_addr = findDirectoryAddr(disk, path);
         if(dir_addr == -1) {
             printf("DELETE: failed %s does not exist\n", path);
-            return;
+            return -1;
         }
         readBlock(disk, dir_addr, dir);
     }
@@ -625,7 +634,7 @@ void deleteFile(FILE* disk, char* file_name, char* path) {
             for(j = 0; j < strlen(file_name) + 1; j++) {
                 dir[i+j] = 0;
             }
-            writeBlock(disk, dir_addr, dir);
+            //writeBlock(disk, dir_addr, dir); //need to write later
             free(temp);
             break;
         }
@@ -634,12 +643,12 @@ void deleteFile(FILE* disk, char* file_name, char* path) {
         if(i == BLOCK_SIZE-32) {
             printf("READ: file: %s does not exist in current directory\n", file_name);
             free(dir);
-            return;
+            return -1;
         }
     }
 
     //get Inode address from inode number
-    free(dir);
+    //free(dir);
     char INode_Addr[3];    
     findINodeAddr(disk, INode_Addr, INode_Num);
     int addr = (int)strtol(INode_Addr, NULL, 16);    //hex to int
@@ -657,7 +666,7 @@ void deleteFile(FILE* disk, char* file_name, char* path) {
         printf("DELETE: INode: %s\n", INode);
     }
     
-
+    char* buffer;
     //check if directory - must be empty
     if(INode[4] == '1') {
         char temp_path[strlen(path) + strlen(file_name) + 1];
@@ -667,22 +676,22 @@ void deleteFile(FILE* disk, char* file_name, char* path) {
         if(debug == 1) {
             printf("DELETE: temp_path: %s\n", temp_path);
         }
-        int dir_addr = findDirectoryAddr(disk, temp_path);
-        dir = malloc(BLOCK_SIZE);
-        readBlock(disk, dir_addr, dir);
+        int dir_addr2 = findDirectoryAddr(disk, temp_path);
+        buffer = malloc(BLOCK_SIZE);
+        readBlock(disk, dir_addr2, buffer);
         for(i = 0; i < BLOCK_SIZE; i += 32) {
-            if(dir[i] != 0) {
+            if(buffer[i] != 0) {
                 printf("DELETE: Failed, cannot delete a non-empty directory\n");
+                free(buffer);
                 free(dir);
                 free(INode);
-                return;
+                return -1;
             }
         }
-        free(dir);
+        free(buffer);
     }
-
-    //delete from parent directory
-
+    writeBlock(disk, dir_addr, dir); //erase directory name from parent directory
+    free(dir);
 
     int blocks[10] = { 0 };
     int num_blocks = 0;
@@ -712,7 +721,7 @@ void deleteFile(FILE* disk, char* file_name, char* path) {
     }
 
     //write blocks as available in mapping
-    char* buffer = malloc(BLOCK_SIZE);
+    buffer = malloc(BLOCK_SIZE);
     readBlock(disk, 1, buffer);
     for(i = 0 ; i < num_blocks; i++) {
         int byte_num = blocks[i] / 8;
@@ -744,31 +753,89 @@ void deleteFile(FILE* disk, char* file_name, char* path) {
     writeBlock(disk, addr, buffer);
     free(buffer);
     free(INode);
-
+    return 0;
 }
 
-int main (int argc, char* argv[]) {
+/*int main (int argc, char* argv[]) {
     FILE* disk = fopen("../disk/vdisk", "r+b");
 
     //if disk needs to be created
     if(argc > 1) {
         if(strcmp(argv[1], "init") == 0) {
             createDisk(disk);
-            //printf("size of root_init: %lu\n", strlen(root_init));
-            //createFile(disk, "1111", '\0', "root");
-            //free(root_init);
         }
     }
 
     char* file_con = "Gt85LeGhaEs7iGp7khXXrMMk08KFNBJhVroxE42rv6uEHSUBEjy9OHLhdj0lMFyHywAhJgz0XLky9PDUDFrPin7i6W5wAlQ6V53fUExBNkK9VNzFhgwG3ajig9ph9FhhCIeeA5UmsFD6Qnt8zREmAWFGO7qCJUwcCfrO8plpapGTC7apP2lGiQkj1sypu6WRcJFNidIcNTvDu7nJQJngUr9j7mye81iCQP1OnIunkV7Ho8rLyC5ZOPx3y9oY0XYtzIQkfRdFRwIHwVkXBSAq0dw8JUB8if6OAyC5bIEZiqnku7MwMuEo5a2k9Im3STJRzNwwsPjiiT9470DWqRVvMVBYnQDnciD0iIcdoPJhr0phzAhSCfbrEKYbeAD64UTBeXCRowwcrWKaO95GFI0r0pyCo6arOI3BgXVOH7mVYvMRQ7oF8R10Vauv7iwuCxJ4fE9gXwIG80uLAw35NIUz1BC39yobFehFfUMc05cBirZjWN6HcOh7jzOuPUwfDs4GgGR5IOWmCmE9C1Cr7ryCy6D6coazAE1Jr8IzmKkBIG7yyl5n42baolbQhO0bg7IZ9tg74h2ZrSAAmXhYNSM8NCSiRoD398r3A74ubVKFmdy2u7S3SrVWPpw0ZO3C8w5kGXfrAcGRXK4rYD1YwRkgDRHhI0OxQm33NxSzVqWQrUKQQnNE9x9Sxp6bLtzozy6Jl2Bjp4601mrDr9YF4IvtsfmGjYSekLqWDKzoR9QdPgUyV4CA4UoiS1AnZpDGDGQmwVPPl9O3vNsJ4zl9xs5txQ3xWuc2ZOtJJCymHvBeAiz7uy5WgjND1EZ1HbCvpScilubojqX89EqFllK76bnDK1rearuCZRWuEhdEkyzqEg2Ri3Inf5xT4V1bhZ6iKsPOT3K5RpKVGmpf43VFqZgmDCCMShPstalFVkYwdJMbaxctELcuX7IuzoGzN3d9xVeJFLiMTdHjeggz185NTaIJGsFqQON5CWKMdIdmkuymxJv0ICMCmi6LEGcw3hgBkbNCrQBGHeICHdQoRvjuX5HvYTkjIDva8lZz1SZOANdUF6kkGZ07HXWm9114DHelZSf2YyDev95YFZPC1xO1xWKgX0JPdIV5xjYGIj1BzdBfcSgU00I8SyvzfJRHPdRDv6dCu1Gr7CW0ZJtpjDNkwpHbRao0laJrOiNhURACtZy8Us3cUxthw7J5g9YX3DTpCrpYwjaQOOLGWfZaTYwA0ixPCypAzjlqMqF6FOBr7vHnbifYijC76eZoezSsf28zejLahY29ry3mTit3CM3FPD4hVVqvaP6hU5JfDALzh1ATGfvLutBAD0VJp7UrTtSTazeALfnN7zOwN5M475sNYhcbhUsIi5e7bPXQiLmJAj4Gt0dFCJ18kNvfNADRZaOyNg3jx4Wqks6vQcL9qSH6a9tADP9KXQLqZagXkivtus4UGzvHyTHp6yPZ1kHnVzRXW3XvNMXf7wSdrCB9jYWiab18i9BXbduS";
-    printf("%lu\n", strlen(file_con));
+    //printf("%lu\n", strlen(file_con));
     char path[] = "root";
-    createFile(disk, "0000", file_con, "foobar", path);
-    createFile(disk, "1111", "", "documents", path);
-    //char path2[] = "root/documents";
-    createFile(disk, "0000", file_con, "foobar2", path);
+    int temp;
 
-   // char* newfoobar = "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";
+    printf("Commencing Test 1\n");
+
+    //step 1
+    printf("Step 1: Creating file 'foobar' in %s\n", path);
+    temp = createFile(disk, "0000", file_con, "foobar", path);
+    if(temp != -1) {
+        printf("Step 1: successfully created 'foobar' in %s\n", path);
+        char* hold = readFile(disk, "foobar", path);
+        printf("hold %s\n", hold);
+        printf("file_con %s\n", file_con);
+        if(strcmp(hold, file_con) == 0) {
+            printf("Step 1: read returns expected string\n");
+        }
+        else {
+            printf("Step 1: read returns unexpected string\n");
+            //exit(-1);
+        }
+    }
+    else {
+        printf("Step 1: failed to create 'foobar' in %s. test1 failed: terminate..\n", path);
+        exit(-1);
+    }
+
+    //step 2
+    printf("Step 2: Creating directory 'documents' in %s\n", path);
+    temp = createFile(disk, "1111", "", "documents", path);
+    if(temp != -1) {
+        printf("Step 2: successfully created 'documents' in %s\n", path);
+        char* hold = readFile(disk, "documents", path);
+        if(strcmp(hold, "") == 0) {
+            printf("Step 2: read returns expected string\n");
+        }
+        else {
+            printf("Step 2: read returns unexpected string\n");
+            exit(-1);
+        }
+    }
+    else {
+        printf("Step 2: failed to create 'documents' in %s. test1 failed: terminate..\n", path);
+        exit(-1);
+    }
+    
+    //step 3
+    printf("Step 3: Creating file 'foobar2'in %s\n", path);
+    temp = createFile(disk, "0000", file_con, "foobar2", path);
+    if(temp != -1){
+        printf("Step 3: successfully created 'foobar2' in %s\n", path);
+        char* hold = readFile(disk, "foobar2", path);
+        //printf("hold %s\n", hold);
+        //printf("file_con %s\n", file_con);
+        if(strcmp(hold, file_con) == 0) {
+            printf("Step 3: read returns expected string\n");
+        }
+        else {
+            printf("Step 3: read returns unexpected string\n");
+            //exit(-1);
+        }
+    }
+    else{
+        printf("Step 3: failed to create 'foobar2' in %s. test1 failed: terminate..\n", path);
+        exit(-1);
+    }
+
+    //char path2[] = "root/documents";
+    // char* newfoobar = "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";
     //writeToFile(disk, newfoobar, "foobar2", path2);
 
     //char* foobar2 = readFile(disk, "foobar2", path2);
@@ -776,7 +843,36 @@ int main (int argc, char* argv[]) {
         //printf("Read File:\n%s\n", foobar2);
         //free(foobar2);
     //}
-    deleteFile(disk, "documents", path);
-    createFile(disk, "0000", "", "idk", path);
+    //step 4
+    printf("Step 4: Deleting directory 'documents' in %s\n", path);
+    temp = deleteFile(disk, "documents", path);
+    if(temp != -1) {
+        printf("Step 4: successfully deleted 'documents' from %s", path);
+    }
+    else{
+        printf("Step 4: failed to delete 'documents' from %s. test1 failed: terminate..\n", path);
+        exit(-1);
+    }
+
+    printf("Step 5: Create file 'idk' in %s\n", path);
+    temp = createFile(disk, "0000", "test", "idk", path);
+    if(temp != -1) {
+        printf("Step 5: successfully created 'idk' in %s\n", path);
+        char* hold = readFile(disk, "idk", path);
+        if(strcmp(hold, "test") == 0) {
+            printf("Step 5: read returns expected string\n");
+        }
+        else {
+            printf("Step 5: read returns unexpected string\n");
+            //exit(-1);
+        }
+    }
+    else {
+        printf("Step 5: failed to create 'idk' in %s. test1 failed: terminate..\n", path);
+        exit(-1);
+    }
+
     fclose(disk);
-}
+
+    printf("Test 1 successful\n\n");
+}*/

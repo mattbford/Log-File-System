@@ -1,7 +1,8 @@
 # filesystem make file
 DISK = ../disk
-TARGETS = $(DISK)/disk file
-OBJS = file.o $(DISK)/disk.o
+APPS = ../apps
+TARGETS = $(DISK)/disk file $(APPS)/test1
+OBJS = file.o $(DISK)/disk.o $(APPS)/test1.o
 CFLAGS += -g -std=gnu11
 all: $(TARGETS)
 $(TARGETS): $(OBJS)
