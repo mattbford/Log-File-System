@@ -173,7 +173,7 @@ int findDirectoryAddr(FILE* disk, char* path) {
     char temp_path[strlen(path)]; // to prevent altering of path
     strcpy(temp_path, path);
     char** steps = NULL;
-    const char s[2] = "";
+    const char s[2] = "/";
     char* token = strtok(temp_path, s);
     
     while (token != NULL) {
@@ -224,7 +224,14 @@ int findDirectoryAddr(FILE* disk, char* path) {
         //get first block from inode (directories are only 1 block large)
         char temp[3] = { INode[8], INode[9], '\0' };
         int block_addr = (int)strtol(temp, NULL, 16);
-        return block_addr;
+        if(j == n-1) {
+            printf("FINDDIRADDR: %d\n", block_addr);
+            return block_addr;
+        }
+        else {
+            dir = malloc(BLOCK_SIZE);
+            readBlock(disk, block_addr, dir);
+        }
     }
 }
 
@@ -384,49 +391,24 @@ void createFile(FILE* disk, char* type, char* file, char* name, char* path) {
     //INodes take 2 bytes
     //int INode_block = (NUM_INODES / (BLOCK_SIZE / 2)) + 2;
 
-    //write filename and inode number to appropriate directory - root for now (block 10)
-    //TODO Sub-Directories
+    //write filename and inode number to appropriate directory
     INode_Num += '0';
-    /*char* dir;
-    char temp_path[strlen(path)]; // to prevent altering of path
-    strcpy(temp_path, path);
-    if(strcmp(path, "root") != 0) {
-        // get last name from path to read as the directory
-        const char s[2] = "/";
-        char* token = strtok(temp_path, s);
-        
-        while (token != NULL) {
-            printf("token: %s\n", token);
-            if(strcmp(token, "root") != 0) {
-                dir = token;
-            }
-            token = strtok(NULL, s);
-        }
-        int n = strlen(path) - strlen(dir);
-        char read_path[n];
-        strncpy(read_path, path, n-1);
-        read_path[n-1] = '\0';
-        dir = readFile(disk, dir, read_path);
-    }
-    else {
-        dir = malloc(BLOCK_SIZE);
-        readBlock(disk, 10, dir);
-    }*/
     char* dir = malloc(BLOCK_SIZE);
+    int dir_addr = 10;
     if(strcmp(path, "root") != 0) {
-        int addr = findDirectoryAddr(disk, path);
-        if(addr == -1) {
+        dir_addr = findDirectoryAddr(disk, path);
+        if(dir_addr == -1) {
             printf("CREATE: failed %s does not exist\n", path);
             return;
         }
-        readBlock(disk, addr, dir);
+        readBlock(disk, dir_addr, dir);
     }
     else {        
-        readBlock(disk, 10, dir);
+        readBlock(disk, dir_addr, dir);
     }
     for(i = 0; i < BLOCK_SIZE; i+=32) {
         //In DIRs INODE #s are stored in hex
-        if(dir[i] == 0x00 && dir[i] != INode_Num) {
+        if(dir[i] == 0x00) {
             dir[i] = INode_Num;
             for(j = 1; j < strlen(name) + 1; j++) {
                 dir[j+i] = name[j-1];
@@ -444,7 +426,7 @@ void createFile(FILE* disk, char* type, char* file, char* name, char* path) {
             printf("CREATE: %c %d\n", dir[i], i);
         }*/
     }
-    writeBlock(disk, 10, dir);
+    writeBlock(disk, dir_addr, dir);
     free(dir);
 
     //write file data
@@ -631,7 +613,7 @@ int main (int argc, char* argv[]) {
     //char* newfoobar = "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";
     //writeToFile(disk, newfoobar, "foobar2");
 
-    char* foobar2 = readFile(disk, "foobar2", "root/documents");
+    char* foobar2 = readFile(disk, "documents", path);
     if(foobar2 != '\0') {
         printf("Read File:\n%s\n", foobar2);
         free(foobar2);
