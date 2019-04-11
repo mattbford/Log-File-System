@@ -73,4 +73,5 @@ Robustness(kinda):
     very efficient.
 
 The tests currently don't work. CreateFile is not adding the file data to the disk for some reason. However if the test code is copied into 
-file.c's main it works correctly. 
+file.c's main it works correctly. Bascially test1 test create and read including subdirectories as well as the deletion of an empty directory.
+Test2 tests create, read, write, and deletion. I have no clue why this is happening and due to time constraints I am unable to investigate further.

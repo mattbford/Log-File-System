@@ -11,6 +11,8 @@ int main (int argc, char* argv[]) {
     char path[] = "root";
     int temp;
 
+    //createDisk(disk);
+
     printf("Commencing Test 2\n");
 
     //step 1
@@ -61,8 +63,6 @@ int main (int argc, char* argv[]) {
     if(temp != -1){
         printf("Step 3: successfully created 'foobar2' in %s\n", path2);
         char* hold = readFile(disk, "foobar2", path2);
-        //printf("hold %s\n", hold);
-        //printf("file_con %s\n", file_con);
         if(strcmp(hold, file_con) == 0) {
             printf("Step 3: read returns expected string\n");
         }
@@ -83,8 +83,6 @@ int main (int argc, char* argv[]) {
     if(temp != -1) {
         printf("Step 4: successfully wrote to 'foobar2' in %s\n", path2);
         char* hold = readFile(disk, "foobar2", path2);
-        //printf("hold %s\n", hold);
-        //printf("file_con %s\n", file_con);
         if(strcmp(hold, newfoobar) == 0) {
             printf("Step 4: read returns expected string\n");
         }
