@@ -1,7 +1,11 @@
 #!/bin/bash
 
-make apps/test1
-make apps/test2
+set -e
+io/make test1
+io/make test1
 
+echo $'running 1st test\n'
 apps/test1
+
+echo$'running 2nd test\n'
 apps/test2
