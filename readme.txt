@@ -1,8 +1,5 @@
-The Little "I'm not really sure what to call this anymore" Log(?) File System
+The "Little" Log File System
 -by Matthew Belford
-
-Warning to the reader: If you are looking at this code and thinking "what the heck is going on" just remember Yvonne made me do it.
-In all seriousness though, thank you for an excellent semester! This project, though hard, was very rewarding and interesting.
 
 Currently my system has the following functionality in place:
     -Simulation of a file system
@@ -14,17 +11,17 @@ Currently my system has the following functionality in place:
     -robustness (kind of)
 
 Simulation of a file system:
-    I tried my best to follow the specifications of the LLFS document provided. I create 4096 blocks of size 512 bytes each.
+    I created 4096 blocks of size 512 bytes each.
     The first 10 blocks are reserved  with block 0 being the superblock, block 1 being the freeblock vector and I reappropriated 
     blocks 2-9 as the Inode mapping. The freeblock vector uses a single bit to represent which blocks are free and which are taken.
-    This is calculated using a lot of logic math that I don't really want to talk about. It is highlighted in the findFreeBlock functionality
-    if you are curious. The Inode mapping breaks each two bytes down into a big endian hex number which is equal to the block number
-    (in integer form) in which that corresponding INode is stored. findFreeINode() returns the inode number of the first section of the Inode
-    mapping that is empty starting from block 2. findINodeAddr takes an INode number and finds its corresponding address in the INode mapping.
-    The one feature that did not make it into this filesystem is the concept of single and doubly indirects, so file sizes are capped at 10 blocks.
-    I really wish I had time to implement it, but I thought it would be far more interesting to implement the deleteFile function instead. Furthermore,
-    I did not implement the caching approach, partly because I was already in too deep and partly because I figured that the filesystem would be
-    far more reliable if all data was written immediately(not realizing that robustness was goal 3).
+    This is calculated using a lot of logic math that I don't really want to talk about. It is highlighted in the findFreeBlock         
+    functionality if you are curious. The Inode mapping breaks each two bytes down into a big endian hex number which is equal to the 
+    block number (in integer form) in which that corresponding INode is stored. findFreeINode() returns the inode number of the first
+    section of the Inode mapping that is empty starting from block 2. findINodeAddr takes an INode number and finds its corresponding
+    address in the INode mapping. The one feature that did not make it into this filesystem is the concept of single and doubly
+    indirects, so file sizes are capped at 10 blocks. I didn't have time to finish it and I thought it would be far more interesting to 
+    implement the deleteFile function instead. Furthermore, I did not implement caching as it would require heavy refactoring and the 
+    system is a lot more robust without it as data is written immediately and will not be lost in event of a crash.
 
 Create Files:
     An absolute behemoth of a system that I totally underestimated. I thought I would be able to write this and be done with it but I was very wrong.
