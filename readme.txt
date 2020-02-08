@@ -24,19 +24,18 @@ Simulation of a file system:
     system is a lot more robust without it as data is written immediately and will not be lost in event of a crash.
 
 Create Files:
-    An absolute behemoth of a system that I totally underestimated. I thought I would be able to write this and be done with it but I was very wrong.
-    The shear number of things that the createFile() function has to build and keep track of is massive. I got my first taste of how big this
-    system was going to be when I began to construct the INodes. Overall I did not have too many scalability issues with the createFile() function
-    and I would argue it is probably some of the best code that I wrote in this assignment. However, I did find myself coming back to it
-    repeatedly to iron out bugs and add new features such as subdirectories.
+    An absolute behemoth of a system that I totally underestimated.
+    The shear number of things that the createFile() function has to build and keep track of is massive. I got my first taste of how 
+    big this system was going to be when I began to construct the INodes. Overall I did not have too many scalability issues with the 
+    createFile() function and I would argue it is probably some of the best code that is written in this system. However, I did find 
+    myself coming back to it repeatedly to iron out bugs and add new features such as subdirectories.
 
 Read and Write Files:
-    The functions readFile() and writeFile() suffered from major scalability problems from the beginning. As new features and specifications were
-    added, the functions needed to be altered very carefully. This was the most frustrating part of the assignment. The amount of times I broke
-    these functions is uncountable. Everytime I thought I had it, I realized that I had one more feature to add that would completely change 
-    the format of the function. Overall both functions are jumbled messes that share a lot of code. There are large chunks of code that could
-    be exported into their own functions but due to time constraints I chose to not bother with this approach. A list of features that broke
-    these functions:
+    The functions readFile() and writeFile() suffered from major scalability problems from the beginning. As new features and 
+    specifications were added, the functions needed to be altered very carefully. The amount of times I broke these functions is 
+    uncountable. Everytime I thought I had it, I realized that I had one more feature to add that would completely change the format of 
+    the function. Overall both functions are jumbled messes that share a lot of code. There are large chunks of code that could be 
+    exported into their own functions but I was unable due to time constraints. A list of features that broke these functions:
         INodes
         Indirects
         subdirectories
@@ -44,14 +43,15 @@ Read and Write Files:
         deletes
 
 Subdirectories:
-    This was the quintessential "stay up till 3am coding" experience. I didn't know what broken meant before I attempted to add directories.
-    I built the findDirectoryAddr() function to deal with this problem. It tokenizes the path and searches through the filesystem from each step
-    eventually returning the integer address of the head of the path. I realized about half-way through implementing directories that a more
-    elegant solution would be to include the path in the file_name parameter, but I was too far gone and the system works nonetheless.
-    Needless to say, I don't really want to talk about it.
+    This was the quintessential "stay up till 3am coding" experience. I didn't know what broken meant before I attempted to add 
+    directories. I built the findDirectoryAddr() function to deal with this problem. It tokenizes the path and searches through the 
+    filesystem from each step eventually returning the integer address of the head of the path. I realized about half-way through 
+    implementing directories that a more elegant solution would be to include the path in the file_name parameter, but I was too far 
+    gone and the system works nonetheless. Needless to say, I don't really want to talk about it.
 
 Deletion:
-    Surprisingly easy. It was nearly a copy-paste of different sections of features I had already implemented. The following was my process:
+    Surprisingly easy. It was nearly a copy-paste of different sections of features I had already implemented. The following was my 
+    process:
         -make sure file exists
         -get Inode
         -if directory make sure its empty
@@ -63,12 +63,10 @@ Deletion:
     I didn't have any problems with this feature as it magically worked first try.
 
 Robustness(kinda):
-    Due to the lack of a cache, the filesystem is partially robust. Data will not be lost in the event of a crash. The one problem is that
-    if the filesystem crashes mid createFile() then there could be some untraceable resource usage eg. INodes nums that are mapped to empty
-    addresses, etc. If I learned anything from Database Systems is that we have three aspects to a system: Speed, Durability, and Cost. 
-    We can only ever satisfy two of those aspects. I chose durability and cost(my time and sanity) and as a result the system definitely isn't
-    very efficient.
+    Due to the lack of a cache, the filesystem is partially robust. Data will not be lost in the event of a crash. The one problem is 
+    that if the filesystem crashes mid createFile() then there could be some untraceable resource usage eg. INodes nums that are mapped 
+    to empty addresses, etc. If I learned anything from Database Systems is that we have three aspects to a system: Speed, Durability, 
+    and Cost. We can only ever satisfy two of those aspects. I chose durability and cost(my time and sanity) and as a result the system 
+    definitely isn't very efficient.
 
-The tests currently don't work. CreateFile is not adding the file data to the disk for some reason. However if the test code is copied into 
-file.c's main it works correctly. Bascially test1 test create and read including subdirectories as well as the deletion of an empty directory.
-Test2 tests create, read, write, and deletion. I have no clue why this is happening and due to time constraints I am unable to investigate further.
+The tests currently don't work. CreateFile is not adding the file data to the disk for some reason. However if the test code is copied into file.c's main it works correctly. Bascially test1 test create and read including subdirectories as well as the deletion of an empty directory. Test2 tests create, read, write, and deletion. I have no clue why this is happening and due to time constraints I am unable to investigate further.
